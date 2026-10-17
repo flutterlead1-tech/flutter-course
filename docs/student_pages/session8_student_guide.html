@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Session 8 · Firebase Auth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: same reading column and Debug Paint styling as Session 3, plus numbered setup steps and the three auth-gate states */
+:root {
+  --ground: #f5f8fa;
+  --paper: #ffffff;
+  --ink: #14212b;
+  --muted: #566672;
+  --line: #d3dde4;
+  --accent: #0a6fb8;
+  --accent-soft: #e2f0fa;
+  --paint: #11a3a3;          /* Debug Paint cyan for outlines */
+  --warn: #b5450b;
+  --warn-soft: #fbeee6;
+  --ok: #1f7a3d;
+  --code-bg: #eef3f6;
+  --box1: #e86a4a; --box2: #2f9e5f; --box3: #3478c6;
+
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --s-1: 0.8125rem; --s0: 1rem; --s1: 1.25rem; --s2: 1.6rem; --s3: 2.4rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e161c; --paper: #15212a; --ink: #e3ebf0; --muted: #93a5b1;
+    --line: #2a3a46; --accent: #5cb4f0; --accent-soft: #15324a; --paint: #3fd0cf;
+    --warn: #f0965e; --warn-soft: #3a2316; --ok: #5fcf87; --code-bg: #0f1b23;
+    --box1: #e8805f; --box2: #4fb979; --box3: #5f9ce0;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e161c; --paper: #15212a; --ink: #e3ebf0; --muted: #93a5b1;
+  --line: #2a3a46; --accent: #5cb4f0; --accent-soft: #15324a; --paint: #3fd0cf;
+  --warn: #f0965e; --warn-soft: #3a2316; --ok: #5fcf87; --code-bg: #0f1b23;
+  --box1: #e8805f; --box2: #4fb979; --box3: #5f9ce0;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground); color: var(--ink);
+  font-family: var(--body); font-size: var(--s0); line-height: 1.65;
+  padding-inline: 20px; padding-block: 0 72px;
+}
+.wrap { max-width: 760px; margin-inline: auto; display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h2 { font-size: var(--s2); font-weight: 800; }
+h3 { font-size: var(--s1); font-weight: 600; }
+p { margin: 0; max-width: 65ch; }
+a { color: var(--accent); }
+code { font-family: var(--mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre {
+  margin: 0; font-family: var(--mono); font-size: var(--s-1); line-height: 1.6;
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 14px 16px; overflow-x: auto; color: var(--ink);
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+.k { color: var(--accent); font-weight: 600; }
+.c { color: var(--muted); }
+.label {
+  font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--paint); font-weight: 600;
+}
+section { display: grid; gap: 18px; }
+
+/* Header */
+header { padding-block: 48px 0; display: grid; gap: 16px; }
+header h1 { font-size: clamp(2.2rem, 7vw, var(--s3)); font-weight: 800; letter-spacing: -0.01em; }
+header h1 span { color: var(--accent); }
+.lede { font-size: 1.1rem; color: var(--muted); }
+.goal {
+  border: 1.5px dashed var(--paint); border-radius: 10px; padding: 16px 18px;
+  background: var(--paper); display: grid; gap: 6px;
+}
+
+/* Concept blocks */
+.concept { border-top: 1px solid var(--line); padding-top: 28px; display: grid; gap: 14px; }
+.concept-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.demo-num {
+  font-family: var(--mono); font-size: var(--s-1); color: var(--paint);
+  border: 1.5px dashed var(--paint); border-radius: 6px; padding: 0 7px;
+}
+.run { font-family: var(--mono); font-size: var(--s-1); color: var(--muted); }
+.run b { color: var(--ink); font-weight: 600; }
+ul.points { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; max-width: 65ch; }
+
+/* Mini layouts drawn like Debug Paint */
+.stage {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px; display: grid; gap: 12px;
+}
+.stage-row { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: center; }
+.stage-row .cap { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.track {
+  outline: 1.5px dashed var(--paint); outline-offset: -1px; min-height: 56px;
+  display: flex; align-items: center; padding: 4px;
+}
+.b { width: 30px; flex: none; border-radius: 3px; }
+.b1 { background: var(--box1); height: 22px; }
+.b2 { background: var(--box2); height: 40px; }
+.b3 { background: var(--box3); height: 30px; }
+.box-label { color: #fff; font-family: var(--mono); font-size: 0.7rem; display: grid; place-items: center; height: 40px; border-radius: 3px; }
+
+.boxmodel { display: flex; gap: 16px; flex-wrap: wrap; }
+.bm { flex: 1 1 200px; display: grid; gap: 6px; }
+.bm-outer { outline: 1.5px dashed var(--muted); padding: 18px; position: relative; }
+.bm-box { background: var(--accent-soft); outline: 1.5px solid var(--accent); }
+.bm-pad { padding: 18px; }
+.bm-child { background: var(--accent); color: var(--paper); font-family: var(--mono); font-size: 0.72rem; padding: 4px 8px; }
+
+.stack-demo { position: relative; height: 130px; border-radius: 8px; overflow: hidden;
+  background: linear-gradient(135deg, var(--box1), var(--box3)); }
+.stack-demo .badge { position: absolute; top: 10px; left: 10px; background: var(--paper); color: var(--ink);
+  font-size: 0.75rem; font-weight: 600; padding: 2px 10px; border-radius: 20px; }
+.stack-demo .heart { position: absolute; bottom: 10px; right: 12px; color: #fff; font-size: 1.3rem; }
+.stack-demo .pos { position: absolute; font-family: var(--mono); font-size: 0.68rem; color: #fff; opacity: .85; }
+
+.grid-demo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.grid-demo div { height: 44px; border-radius: 6px; outline: 1.5px dashed var(--paint); outline-offset: -1px;
+  display: grid; place-items: center; font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+
+.list-demo { display: grid; gap: 0; outline: 1.5px dashed var(--paint); outline-offset: -1px; max-height: 150px; overflow: hidden; position: relative; }
+.list-demo div { padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: var(--s-1); display: flex; justify-content: space-between; }
+.list-demo div span { color: var(--muted); font-family: var(--mono); font-size: 0.7rem; }
+.list-demo::after { content: "rows 10 – 999 not built yet"; position: absolute; inset: auto 0 0 0; padding: 6px 12px;
+  background: linear-gradient(transparent, var(--paper) 55%); font-family: var(--mono); font-size: 0.7rem; color: var(--paint); text-align: right; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+td code { white-space: nowrap; }
+
+/* File tree */
+.tree { font-family: var(--mono); font-size: var(--s-1); line-height: 1.8; }
+.tree .note { color: var(--muted); }
+.tree .hl { color: var(--accent); font-weight: 600; }
+
+/* Errors */
+.err { display: grid; gap: 10px; }
+.err-item { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; display: grid; gap: 4px; }
+.err-item b { font-family: var(--mono); font-size: var(--s-1); color: var(--warn); font-weight: 600; }
+
+/* Checklist */
+.checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.checks li { display: flex; gap: 10px; align-items: flex-start; }
+.checks input { margin-top: 5px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+.checks label { cursor: pointer; }
+
+details { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; }
+details summary { cursor: pointer; font-weight: 500; }
+details p { margin-top: 8px; color: var(--muted); }
+.qa { display: grid; gap: 8px; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 520px) {
+  .stage-row { grid-template-columns: 1fr; gap: 4px; }
+}
+
+/* Show => and != as typed, not as joined symbols */
+code, pre { font-variant-ligatures: none; }
+/* Session 8 additions */
+.note-box { border: 1.5px dashed var(--paint); border-radius: 10px; padding: 12px 16px; background: var(--paper); display: grid; gap: 6px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: step; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: start; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.steps li::before { content: counter(step); font-family: var(--mono); font-weight: 600; color: var(--paint); border: 1.5px dashed var(--paint); border-radius: 6px; text-align: center; font-size: var(--s-1); line-height: 1.6; }
+.gate { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: stretch; }
+.gate .g { background: var(--paper); border: 1.5px dashed var(--paint); border-radius: 12px; padding: 12px; display: grid; gap: 4px; align-content: start; }
+.gate .g b { font-family: var(--mono); font-size: 0.8rem; color: var(--paint); }
+.gate .g span { font-size: 0.88rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="label">Flutter course · Session 8 of 15</span>
+  <h1>Firebase <span>&amp;</span> Authentication</h1>
+  <p class="lede">Until now every app lived on one phone. Real apps know who you are, from any phone. Today you connect your app to Firebase, Google's ready-made backend, and let people create an account, log in, log out, and stay logged in after the app closes.</p>
+  <div class="goal">
+    <span class="label">By the end of today you can</span>
+    <p>Connect a Flutter app to Firebase, build register, login and logout screens, show a clear message for every kind of error, and keep the user logged in across restarts.</p>
+  </div>
+</header>
+
+<section>
+  <h2>The big picture: the office building</h2>
+  <p>A <b>backend</b> is a computer on the internet that stores accounts and data for your app. <b>Firebase</b> is a backend you don't have to build or run: you switch features on in a website. Today we use <b>Firebase Authentication</b>. Next session, <b>Firestore</b> (a database).</p>
+  <div class="table-wrap"><table>
+    <tr><th>In the building</th><th>In Firebase</th></tr>
+    <tr><td>The building</td><td>Your <b>Firebase project</b></td></tr>
+    <tr><td>The reception desk</td><td><b>Firebase Auth</b></td></tr>
+    <tr><td>Registering at reception gives you an ID badge</td><td><code>createUserWithEmailAndPassword</code> gives you a <code>User</code></td></tr>
+    <tr><td>Showing your badge to get in</td><td><code>signInWithEmailAndPassword</code></td></tr>
+    <tr><td>Handing the badge back</td><td><code>signOut()</code></td></tr>
+    <tr><td>Your badge stays in your pocket when you go home</td><td>Firebase saves the login on the device, so you stay logged in after a restart</td></tr>
+    <tr><td>A bell that rings whenever your badge status changes</td><td><code>authStateChanges()</code>: a Stream that says “logged in as X” or “logged out”</td></tr>
+    <tr><td>Reception says “wrong password” or “that email already has a badge”</td><td>Error codes you turn into friendly messages</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>Setup: connecting your app to Firebase</h2>
+  <p>You do this once per project. It's the least exciting part, but everything else depends on it.</p>
+  <ol class="steps">
+    <li><div><b>Create a Firebase project</b> at <code>console.firebase.google.com</code> → Add project. The free “Spark” plan is enough.</div></li>
+    <li><div><b>Turn on email login:</b> Build → Authentication → Get started → Sign-in method → <b>Email/Password</b> → Enable → Save.</div></li>
+    <li><div><b>Install the tools</b> (once per computer):
+      <pre><code>npm install -g firebase-tools        <span class="c"># the Firebase CLI (needs Node.js)</span>
+firebase login                       <span class="c"># opens the browser to sign in</span>
+dart pub global activate flutterfire_cli</code></pre>
+      If <code>flutterfire</code> isn't found, add <code>$HOME/.pub-cache/bin</code> to your PATH.</div></li>
+    <li><div><b>Connect the app.</b> In your project folder run <code>flutterfire configure</code>, pick your Firebase project, and tick Android, iOS and Web. It creates <code>lib/firebase_options.dart</code>, puts <code>google-services.json</code> in <code>android/app/</code>, and puts <code>GoogleService-Info.plist</code> in <code>ios/Runner/</code> for you.</div></li>
+    <li><div><b>Add the packages:</b> <code>flutter pub add firebase_core firebase_auth</code></div></li>
+    <li><div><b>Start Firebase in <code>main()</code></b>, before the app runs. It's the same async <code>main</code> pattern as Session 7:
+      <pre><code><span class="k">import</span> <span class="k">'package:firebase_core/firebase_core.dart'</span>;
+<span class="k">import</span> <span class="k">'firebase_options.dart'</span>;
+
+Future&lt;<span class="k">void</span>&gt; main() <span class="k">async</span> {
+  WidgetsFlutterBinding.ensureInitialized();
+  <span class="k">await</span> Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(<span class="k">const</span> ProviderScope(child: MyApp()));
+}</code></pre></div></li>
+  </ol>
+  <div class="note-box">
+    <span class="label">Is it safe to put firebase_options.dart on GitHub?</span>
+    <p>Yes. Those values are like a shop's <b>address</b>, not its key: they say which Firebase project to talk to, and every app shipped to users contains them. What protects your data is Firebase's <b>security rules</b>, which is Session 9's topic.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Firebase words, in plain English</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Code</th><th>What it means</th></tr>
+    <tr><td><code>FirebaseAuth.instance</code></td><td>The reception desk. Every auth call starts here.</td></tr>
+    <tr><td><code>User</code></td><td>A logged-in person. Has <code>uid</code> (a unique id, used in Session 9) and <code>email</code>.</td></tr>
+    <tr><td><code>User?</code></td><td>A User means <b>logged in</b>. <code>null</code> means <b>logged out</b>.</td></tr>
+    <tr><td><code>currentUser</code></td><td>Who's logged in right now (or null).</td></tr>
+    <tr><td><code>Stream</code></td><td>Like a Future that can answer <b>many times</b>. A Future answers once; a Stream keeps sending new values.</td></tr>
+    <tr><td><code>authStateChanges()</code></td><td>A <code>Stream&lt;User?&gt;</code> that sends a new value at app start, after login and after logout.</td></tr>
+    <tr><td><code>StreamProvider</code></td><td>The Riverpod way to watch a Stream. Gives an <code>AsyncValue</code>, just like <code>FutureProvider</code> in Session 6.</td></tr>
+    <tr><td><code>FirebaseAuthException</code></td><td>The error Firebase throws. Its <code>code</code> says what went wrong.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>The concepts, in the order we cover them</h2>
+
+  <div class="concept">
+    <div class="concept-head"><span class="demo-num">1</span><h3>Register, log in, log out</h3></div>
+    <p>Three calls do the real work. Everything around them is Session 4 (a validated form) and Session 6 (<code>async</code>, a loading state, errors).</p>
+    <pre><code><span class="k">final</span> auth = FirebaseAuth.instance;
+
+<span class="k">await</span> auth.createUserWithEmailAndPassword(email: email, password: password);   <span class="c">// register</span>
+<span class="k">await</span> auth.signInWithEmailAndPassword(email: email, password: password);       <span class="c">// log in</span>
+<span class="k">await</span> auth.signOut();                                                           <span class="c">// log out</span></code></pre>
+    <p>After registering, open the Firebase console → Authentication → <b>Users</b>. Your new account is there.</p>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><span class="demo-num">2</span><h3>Staying logged in: authStateChanges and the auth gate</h3></div>
+    <p>Firebase remembers the login on the device. <code>authStateChanges()</code> tells your app who is logged in, every time it changes. A small widget called an <b>auth gate</b> decides which screen to show:</p>
+    <div class="gate">
+      <div class="g"><b>loading</b><span>Checking the saved login. Show a spinner.</span></div>
+      <div class="g"><b>user == null</b><span>Nobody is logged in. Show the <b>Login</b> screen.</span></div>
+      <div class="g"><b>user != null</b><span>Someone is logged in. Show the <b>Home</b> screen.</span></div>
+    </div>
+    <pre><code><span class="k">final</span> authStateProvider = StreamProvider&lt;User?&gt;((ref) {
+  <span class="k">return</span> FirebaseAuth.instance.authStateChanges();
+});
+
+<span class="k">class</span> AuthGate <span class="k">extends</span> ConsumerWidget {
+  <span class="k">const</span> AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    <span class="k">return</span> ref.watch(authStateProvider).when(
+      loading: () =&gt; <span class="k">const</span> Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, _) =&gt; Scaffold(body: Center(child: Text(<span class="k">'$error'</span>))),
+      data: (user) =&gt; user == <span class="k">null</span> ? <span class="k">const</span> LoginScreen() : <span class="k">const</span> HomeScreen(),
+    );
+  }
+}</code></pre>
+    <ul class="points">
+      <li>Use <code>AuthGate</code> as the app's <code>home</code>.</li>
+      <li><b>After <code>signOut()</code> you don't navigate anywhere.</b> The stream sends <code>null</code>, and the gate swaps to the Login screen by itself. Logging in works the same way in reverse.</li>
+      <li><b>The restart test:</b> log in, close the app completely, and open it again. You land straight on Home.</li>
+    </ul>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><span class="demo-num">3</span><h3>The right message for every error</h3></div>
+    <p>Firebase throws a <code>FirebaseAuthException</code>. Turn its <code>code</code> into a sentence, just like Session 6's <code>ApiException</code>:</p>
+    <pre><code><span class="k">try</span> {
+  <span class="k">await</span> FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
+} <span class="k">on</span> FirebaseAuthException <span class="k">catch</span> (e) {
+  setState(() =&gt; _error = messageFor(e.code));    <span class="c">// show it under the form</span>
+}
+
+String messageFor(String code) {
+  <span class="k">switch</span> (code) {
+    <span class="k">case</span> <span class="k">'email-already-in-use'</span>:   <span class="k">return</span> <span class="k">'An account already exists for this email. Try logging in.'</span>;
+    <span class="k">case</span> <span class="k">'weak-password'</span>:          <span class="k">return</span> <span class="k">'Password must be at least 6 characters.'</span>;
+    <span class="k">case</span> <span class="k">'invalid-email'</span>:          <span class="k">return</span> <span class="k">'Enter a valid email address.'</span>;
+    <span class="k">case</span> <span class="k">'invalid-credential'</span>:
+    <span class="k">case</span> <span class="k">'wrong-password'</span>:
+    <span class="k">case</span> <span class="k">'user-not-found'</span>:         <span class="k">return</span> <span class="k">'Email or password is incorrect.'</span>;
+    <span class="k">case</span> <span class="k">'network-request-failed'</span>: <span class="k">return</span> <span class="k">'No internet connection. Check your Wi-Fi or mobile data.'</span>;
+    <span class="k">case</span> <span class="k">'too-many-requests'</span>:      <span class="k">return</span> <span class="k">'Too many attempts. Please wait a few minutes and try again.'</span>;
+    <span class="k">case</span> <span class="k">'user-disabled'</span>:          <span class="k">return</span> <span class="k">'This account has been disabled.'</span>;
+    <span class="k">default</span>:                       <span class="k">return</span> <span class="k">'Something went wrong. Please try again.'</span>;
+  }
+}</code></pre>
+    <div class="table-wrap"><table>
+      <tr><th>Code</th><th>When it happens</th></tr>
+      <tr><td><code>email-already-in-use</code></td><td>Registering with an email that already has an account</td></tr>
+      <tr><td><code>weak-password</code></td><td>Password shorter than 6 characters</td></tr>
+      <tr><td><code>invalid-email</code></td><td>The email isn't a real email format</td></tr>
+      <tr><td><code>invalid-credential</code></td><td>Wrong email or wrong password (see the note below)</td></tr>
+      <tr><td><code>network-request-failed</code></td><td>No internet</td></tr>
+      <tr><td><code>too-many-requests</code></td><td>Too many failed attempts in a short time</td></tr>
+      <tr><td><code>user-disabled</code></td><td>The account was switched off in the console</td></tr>
+    </table></div>
+    <div class="note-box">
+      <span class="label">Why not “wrong-password”?</span>
+      <p>New Firebase projects switch on <b>email enumeration protection</b>. Firebase then won't say whether the email or the password was wrong, and returns <code>invalid-credential</code> for both, so attackers can't find out which emails have accounts. Older projects may still send <code>wrong-password</code> or <code>user-not-found</code>, which is why the code above handles all three the same way.</p>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><span class="demo-num">4</span><h3>Showing who is logged in</h3></div>
+    <pre><code><span class="k">final</span> user = ref.watch(authStateProvider).value;     <span class="c">// User? : null while loading or logged out</span>
+Text(<span class="k">'Logged in as ${user?.email}'</span>);
+
+FilledButton(
+  onPressed: () =&gt; FirebaseAuth.instance.signOut(),   <span class="c">// the gate shows Login by itself</span>
+  child: <span class="k">const</span> Text(<span class="k">'Log out'</span>),
+)</code></pre>
+  </div>
+</section>
+
+<section>
+  <h2>Errors you will see today</h2>
+  <div class="err">
+    <div class="err-item"><b>“No Firebase App '[DEFAULT]' has been created”</b><span><code>Firebase.initializeApp</code> is missing from <code>main()</code>, or isn't awaited.</span></div>
+    <div class="err-item"><b><code>operation-not-allowed</code></b><span>Email/Password sign-in isn't switched on. Firebase console → Authentication → Sign-in method → Email/Password → Enable.</span></div>
+    <div class="err-item"><b>“flutterfire: command not found”</b><span>Add <code>$HOME/.pub-cache/bin</code> to your PATH, then open a new terminal.</span></div>
+    <div class="err-item"><b>In Chrome, you're logged out after you stop and run the app again</b><span>Same as Session 7: Chrome keeps the login per address, and Flutter picks a new random port each run. Run on a fixed port: <code>flutter run -d chrome --web-port 5050</code>. Phones don't have this problem.</span></div>
+    <div class="err-item"><b>The spinner never stops after Log in</b><span>You forgot to set <code>_loading = false</code> in the error branch, so a failed login leaves the button spinning.</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Practice task (in class)</h2>
+  <ul class="checks">
+    <li><input type="checkbox" id="p1"><label for="p1">Create a Firebase project, enable Email/Password, and run <code>flutterfire configure</code> in a new Flutter project.</label></li>
+    <li><input type="checkbox" id="p2"><label for="p2">Build a <b>Register</b> screen and a <b>Login</b> screen with validated email and password fields.</label></li>
+    <li><input type="checkbox" id="p3"><label for="p3">Show a different, clear message for every error in the table above. Try each one on purpose.</label></li>
+    <li><input type="checkbox" id="p4"><label for="p4">Add an auth gate, so a logged-in user goes straight to Home.</label></li>
+    <li><input type="checkbox" id="p5"><label for="p5">Add <b>Log out</b> on the Home screen. Check you're still logged in after closing and reopening the app.</label></li>
+  </ul>
+</section>
+
+<section>
+  <h2>Project: Login Starter App</h2>
+  <p>Give the <b>Paws &amp; Homes</b> login screen from the design you already have a real backend.</p>
+  <ul class="checks">
+    <li><input type="checkbox" id="l1"><label for="l1">Login and Register screens that match the Paws &amp; Homes design: colours, fonts, field styles and the loading button.</label></li>
+    <li><input type="checkbox" id="l2"><label for="l2">Register with name, email, password and confirm password. All fields validated.</label></li>
+    <li><input type="checkbox" id="l3"><label for="l3">A distinct error message for every failure case, shown under the form.</label></li>
+    <li><input type="checkbox" id="l4"><label for="l4">An auth gate using a Riverpod <code>StreamProvider</code>. The session survives a restart.</label></li>
+    <li><input type="checkbox" id="l5"><label for="l5">Home screen shows “Hello, <i>email</i>” and a Log out button.</label></li>
+    <li><input type="checkbox" id="l6"><label for="l6">Bonus: a “Forgot password?” link using <code>sendPasswordResetEmail(email: ...)</code>.</label></li>
+    <li><input type="checkbox" id="l7"><label for="l7">Commit and push to your own GitHub repository.</label></li>
+  </ul>
+</section>
+
+<section>
+  <h2>Check yourself</h2>
+  <div class="qa">
+    <details><summary>What is a backend, and why do apps need one?</summary><p>Computers on the internet that store accounts and data. Without one, data lives on a single phone and is lost when the phone is.</p></details>
+    <details><summary>What's the difference between a Future and a Stream?</summary><p>A Future gives one answer, once. A Stream can keep giving new answers over time.</p></details>
+    <details><summary>What does authStateChanges() send after you log out?</summary><p><code>null</code>, which means nobody is logged in. The auth gate then shows the Login screen.</p></details>
+    <details><summary>Why don't we navigate to the Login screen after signOut()?</summary><p>The auth gate watches <code>authStateChanges()</code>. When it sends null, the gate swaps to Login by itself.</p></details>
+    <details><summary>Why does a wrong password give invalid-credential instead of wrong-password?</summary><p>Email enumeration protection hides whether the email or the password was wrong, so attackers can't discover which emails have accounts.</p></details>
+  </div>
+</section>
+
+<section>
+  <span class="label">Next session</span>
+  <p><b>Session 9 · Firestore Database.</b> Saving data in the cloud, tied to the logged-in user, updating live on every device, and security rules so one user can never read another user's data.</p>
+</section>
+
+</div>
+
+</body>
+</html>

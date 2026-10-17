@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Session 9 · Firestore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: same reading column and Debug Paint styling as Session 3, plus a filing-cabinet diagram of collections and documents */
+:root {
+  --ground: #f5f8fa;
+  --paper: #ffffff;
+  --ink: #14212b;
+  --muted: #566672;
+  --line: #d3dde4;
+  --accent: #0a6fb8;
+  --accent-soft: #e2f0fa;
+  --paint: #11a3a3;          /* Debug Paint cyan for outlines */
+  --warn: #b5450b;
+  --warn-soft: #fbeee6;
+  --ok: #1f7a3d;
+  --code-bg: #eef3f6;
+  --box1: #e86a4a; --box2: #2f9e5f; --box3: #3478c6;
+
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --s-1: 0.8125rem; --s0: 1rem; --s1: 1.25rem; --s2: 1.6rem; --s3: 2.4rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e161c; --paper: #15212a; --ink: #e3ebf0; --muted: #93a5b1;
+    --line: #2a3a46; --accent: #5cb4f0; --accent-soft: #15324a; --paint: #3fd0cf;
+    --warn: #f0965e; --warn-soft: #3a2316; --ok: #5fcf87; --code-bg: #0f1b23;
+    --box1: #e8805f; --box2: #4fb979; --box3: #5f9ce0;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e161c; --paper: #15212a; --ink: #e3ebf0; --muted: #93a5b1;
+  --line: #2a3a46; --accent: #5cb4f0; --accent-soft: #15324a; --paint: #3fd0cf;
+  --warn: #f0965e; --warn-soft: #3a2316; --ok: #5fcf87; --code-bg: #0f1b23;
+  --box1: #e8805f; --box2: #4fb979; --box3: #5f9ce0;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground); color: var(--ink);
+  font-family: var(--body); font-size: var(--s0); line-height: 1.65;
+  padding-inline: 20px; padding-block: 0 72px;
+}
+.wrap { max-width: 760px; margin-inline: auto; display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h2 { font-size: var(--s2); font-weight: 800; }
+h3 { font-size: var(--s1); font-weight: 600; }
+p { margin: 0; max-width: 65ch; }
+a { color: var(--accent); }
+code { font-family: var(--mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre {
+  margin: 0; font-family: var(--mono); font-size: var(--s-1); line-height: 1.6;
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 14px 16px; overflow-x: auto; color: var(--ink);
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+.k { color: var(--accent); font-weight: 600; }
+.c { color: var(--muted); }
+.label {
+  font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--paint); font-weight: 600;
+}
+section { display: grid; gap: 18px; }
+
+/* Header */
+header { padding-block: 48px 0; display: grid; gap: 16px; }
+header h1 { font-size: clamp(2.2rem, 7vw, var(--s3)); font-weight: 800; letter-spacing: -0.01em; }
+header h1 span { color: var(--accent); }
+.lede { font-size: 1.1rem; color: var(--muted); }
+.goal {
+  border: 1.5px dashed var(--paint); border-radius: 10px; padding: 16px 18px;
+  background: var(--paper); display: grid; gap: 6px;
+}
+
+/* Concept blocks */
+.concept { border-top: 1px solid var(--line); padding-top: 28px; display: grid; gap: 14px; }
+.concept-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.demo-num {
+  font-family: var(--mono); font-size: var(--s-1); color: var(--paint);
+  border: 1.5px dashed var(--paint); border-radius: 6px; padding: 0 7px;
+}
+.run { font-family: var(--mono); font-size: var(--s-1); color: var(--muted); }
+.run b { color: var(--ink); font-weight: 600; }
+ul.points { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; max-width: 65ch; }
+
+/* Mini layouts drawn like Debug Paint */
+.stage {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px; display: grid; gap: 12px;
+}
+.stage-row { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: center; }
+.stage-row .cap { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.track {
+  outline: 1.5px dashed var(--paint); outline-offset: -1px; min-height: 56px;
+  display: flex; align-items: center; padding: 4px;
+}
+.b { width: 30px; flex: none; border-radius: 3px; }
+.b1 { background: var(--box1); height: 22px; }
+.b2 { background: var(--box2); height: 40px; }
+.b3 { background: var(--box3); height: 30px; }
+.box-label { color: #fff; font-family: var(--mono); font-size: 0.7rem; display: grid; place-items: center; height: 40px; border-radius: 3px; }
+
+.boxmodel { display: flex; gap: 16px; flex-wrap: wrap; }
+.bm { flex: 1 1 200px; display: grid; gap: 6px; }
+.bm-outer { outline: 1.5px dashed var(--muted); padding: 18px; position: relative; }
+.bm-box { background: var(--accent-soft); outline: 1.5px solid var(--accent); }
+.bm-pad { padding: 18px; }
+.bm-child { background: var(--accent); color: var(--paper); font-family: var(--mono); font-size: 0.72rem; padding: 4px 8px; }
+
+.stack-demo { position: relative; height: 130px; border-radius: 8px; overflow: hidden;
+  background: linear-gradient(135deg, var(--box1), var(--box3)); }
+.stack-demo .badge { position: absolute; top: 10px; left: 10px; background: var(--paper); color: var(--ink);
+  font-size: 0.75rem; font-weight: 600; padding: 2px 10px; border-radius: 20px; }
+.stack-demo .heart { position: absolute; bottom: 10px; right: 12px; color: #fff; font-size: 1.3rem; }
+.stack-demo .pos { position: absolute; font-family: var(--mono); font-size: 0.68rem; color: #fff; opacity: .85; }
+
+.grid-demo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.grid-demo div { height: 44px; border-radius: 6px; outline: 1.5px dashed var(--paint); outline-offset: -1px;
+  display: grid; place-items: center; font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+
+.list-demo { display: grid; gap: 0; outline: 1.5px dashed var(--paint); outline-offset: -1px; max-height: 150px; overflow: hidden; position: relative; }
+.list-demo div { padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: var(--s-1); display: flex; justify-content: space-between; }
+.list-demo div span { color: var(--muted); font-family: var(--mono); font-size: 0.7rem; }
+.list-demo::after { content: "rows 10 – 999 not built yet"; position: absolute; inset: auto 0 0 0; padding: 6px 12px;
+  background: linear-gradient(transparent, var(--paper) 55%); font-family: var(--mono); font-size: 0.7rem; color: var(--paint); text-align: right; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+td code { white-space: nowrap; }
+
+/* File tree */
+.tree { font-family: var(--mono); font-size: var(--s-1); line-height: 1.8; }
+.tree .note { color: var(--muted); }
+.tree .hl { color: var(--accent); font-weight: 600; }
+
+/* Errors */
+.err { display: grid; gap: 10px; }
+.err-item { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; display: grid; gap: 4px; }
+.err-item b { font-family: var(--mono); font-size: var(--s-1); color: var(--warn); font-weight: 600; }
+
+/* Checklist */
+.checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.checks li { display: flex; gap: 10px; align-items: flex-start; }
+.checks input { margin-top: 5px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+.checks label { cursor: pointer; }
+
+details { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; }
+details summary { cursor: pointer; font-weight: 500; }
+details p { margin-top: 8px; color: var(--muted); }
+.qa { display: grid; gap: 8px; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 520px) {
+  .stage-row { grid-template-columns: 1fr; gap: 4px; }
+}
+
+/* Show => and != as typed, not as joined symbols */
+code, pre { font-variant-ligatures: none; }
+/* Session 9 additions */
+.note-box { border: 1.5px dashed var(--paint); border-radius: 10px; padding: 12px 16px; background: var(--paper); display: grid; gap: 6px; }
+.cabinet { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.drawer { background: var(--paper); border: 1.5px dashed var(--paint); border-radius: 12px; padding: 12px; display: grid; gap: 8px; align-content: start; }
+.drawer > b { font-family: var(--mono); font-size: 0.8rem; color: var(--paint); }
+.doc { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-family: var(--mono); font-size: 0.74rem; display: grid; gap: 2px; background: var(--ground); }
+.doc .id { color: var(--accent); font-weight: 600; }
+.doc span { color: var(--muted); }
+.crud { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.crud .c { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 6px; align-content: start; }
+.crud .c b { font-family: var(--mono); font-size: 0.85rem; color: var(--accent); }
+.crud .c code { font-size: 0.74rem; white-space: normal; }
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="label">Flutter course · Session 9 of 15</span>
+  <h1>Firestore <span>Database</span></h1>
+  <p class="lede">Last session, people could log in. Now their data goes to the cloud: it belongs to their account, appears on every device they use, and updates live the moment it changes. Then you'll lock it down so nobody can read anyone else's data.</p>
+  <div class="goal">
+    <span class="label">By the end of today you can</span>
+    <p>Create, read, update and delete documents in Firestore, show them live with a Stream, store data per user with a <code>userId</code> field, and write security rules so users can only see their own data.</p>
+  </div>
+</header>
+
+<section>
+  <h2>The big picture: a filing cabinet in the cloud</h2>
+  <p><b>Firestore</b> is Firebase's database. It isn't a table like Excel; it's a <b>filing cabinet</b>. Each <b>drawer</b> is a <b>collection</b>. Inside each drawer are <b>documents</b>, each one like a single sheet of paper with labelled boxes (<b>fields</b>) on it. Every sheet has a unique <b>id</b>.</p>
+  <div class="cabinet">
+    <div class="drawer"><b>collection: notes</b>
+      <div class="doc"><span class="id">id: a8Fk2Lq…</span><span>title: "Revise Riverpod"</span><span>body: "watch vs read"</span><span>userId: "u7Hs…"</span><span>createdAt: 16 Oct, 10:42</span></div>
+      <div class="doc"><span class="id">id: Zp91mXc…</span><span>title: "Buy milk"</span><span>body: ""</span><span>userId: "k2Qa…"</span><span>createdAt: 16 Oct, 11:05</span></div>
+    </div>
+    <div class="drawer"><b>collection: shoppingItems</b>
+      <div class="doc"><span class="id">id: 3Jd8sWq…</span><span>name: "Rice 5 kg"</span><span>done: false</span><span>userId: "u7Hs…"</span></div>
+    </div>
+  </div>
+  <p>Two more ideas make Firestore special:</p>
+  <ul class="points">
+    <li><b>It's live.</b> When a document changes, every phone and browser that is watching sees the change within a second, like a shared Google Doc.</li>
+    <li><b>It has a security guard.</b> <b>Security rules</b> check the ID badge from Session 8 before letting anyone read or write. Without rules, anyone could read everything.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Setup</h2>
+  <ol class="points">
+    <li>Firebase console → <b>Build → Firestore Database → Create database</b>. Pick a location close to your users (e.g. <code>asia-south1</code>, Mumbai), then <b>Start in production mode</b>. We'll write our own rules today.</li>
+    <li>Add the package: <code>flutter pub add cloud_firestore</code></li>
+    <li>Keep everything from Session 8: <code>Firebase.initializeApp</code> in <code>main()</code>, and the auth gate. Firestore data belongs to the logged-in user.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>Firestore words, in plain English</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Word</th><th>What it means</th></tr>
+    <tr><td><b>Collection</b></td><td>A drawer of documents, e.g. <code>notes</code>.</td></tr>
+    <tr><td><b>Document</b></td><td>One record, e.g. one note. Has an <b>id</b> and <b>fields</b>.</td></tr>
+    <tr><td><b>Field</b></td><td>One named value in a document: <code>title</code>, <code>done</code>, <code>createdAt</code>…</td></tr>
+    <tr><td><code>FirebaseFirestore.instance</code></td><td>The cabinet. Every call starts here.</td></tr>
+    <tr><td><code>.collection('notes')</code></td><td>Open the <code>notes</code> drawer.</td></tr>
+    <tr><td><code>.doc(id)</code></td><td>Pick one sheet by its id.</td></tr>
+    <tr><td><code>.snapshots()</code></td><td>A <b>Stream</b> that sends the documents again every time anything changes. This is what makes the app live.</td></tr>
+    <tr><td><code>QuerySnapshot</code> / <code>.docs</code></td><td>One delivery from that stream: the list of documents right now.</td></tr>
+    <tr><td><code>FieldValue.serverTimestamp()</code></td><td>“Use Firebase's clock for this time”, so every user gets the same, correct time.</td></tr>
+    <tr><td><b>Security rules</b></td><td>The guard. Decide who may read and write each document, using <code>request.auth.uid</code> (the logged-in user's id).</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>The concepts, in the order we cover them</h2>
+
+  <div class="concept">
+    <div class="concept-head"><span class="demo-num">1</span><h3>CRUD: create, read, update, delete</h3></div>
+    <div class="crud">
+      <div class="c"><b>Create</b><code>notes.add({...})</code><span>Adds a document. Firestore makes the id.</span></div>
+      <div class="c"><b>Read once</b><code>notes.doc(id).get()</code><span>Reads one document a single time.</span></div>
+      <div class="c"><b>Read live</b><code>notes.snapshots()</code><span>Keeps sending the latest documents.</span></div>
+      <div class="c"><b>Update</b><code>notes.doc(id).update({...})</code><span>Changes only the fields you give.</span></div>
+      <div class="c"><b>Delete</b><code>notes.doc(id).delete()</code><span>Removes the document.</span></div>
+    </div>
+    <pre><code><span class="k">final</span> notes = FirebaseFirestore.instance.collection(<span class="k">'notes'</span>);
+<span class="k">final</span> uid = FirebaseAuth.instance.currentUser!.uid;     <span class="c">// who is logged in (Session 8)</span>
+
+<span class="c">// Create</span>
+<span class="k">await</span> notes.add({
+  <span class="k">'title'</span>: title,
+  <span class="k">'body'</span>: body,
+  <span class="k">'userId'</span>: uid,                                     <span class="c">// ← whose note this is</span>
+  <span class="k">'createdAt'</span>: FieldValue.serverTimestamp(),
+});
+
+<span class="c">// Update: only the fields you list change</span>
+<span class="k">await</span> notes.doc(note.id).update({<span class="k">'title'</span>: newTitle, <span class="k">'body'</span>: newBody});
+
+<span class="c">// Delete</span>
+<span class="k">await</span> notes.doc(note.id).delete();</code></pre>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><span class="demo-num">2</span><h3>A model class for documents</h3></div>
+    <p>Same idea as Session 6's <code>fromJson</code>: read the document <b>once</b>, in one place. The document's <b>id</b> isn't inside its fields, so we pass it in separately.</p>
+    <pre><code><span class="k">class</span> Note {
+  <span class="k">const</span> Note({<span class="k">required this</span>.id, <span class="k">required this</span>.title, <span class="k">required this</span>.body, <span class="k">this</span>.createdAt});
+  <span class="k">final</span> String id;
+  <span class="k">final</span> String title;
+  <span class="k">final</span> String body;
+  <span class="k">final</span> DateTime? createdAt;
+
+  <span class="k">factory</span> Note.fromFirestore(DocumentSnapshot&lt;Map&lt;String, dynamic&gt;&gt; doc) {
+    <span class="k">final</span> data = doc.data()!;
+    <span class="k">return</span> Note(
+      id: doc.id,                                              <span class="c">// the id comes from the document</span>
+      title: data[<span class="k">'title'</span>] <span class="k">as</span> String,
+      body: data[<span class="k">'body'</span>] <span class="k">as</span> String? ?? <span class="k">''</span>,
+      createdAt: (data[<span class="k">'createdAt'</span>] <span class="k">as</span> Timestamp?)?.toDate(),   <span class="c">// can be null for a moment, see below</span>
+    );
+  }
+}</code></pre>
+    <div class="note-box">
+      <span class="label">Why createdAt can be null</span>
+      <p>When you add a note, Firestore shows it on your screen <b>straight away</b>, before the server has stamped its time. For that first moment <code>createdAt</code> is <code>null</code>. A second later the real time arrives and the stream sends the note again. Always make the time nullable (<code>Timestamp?</code>) and show “Just now” when it's null.</p>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><span class="demo-num">3</span><h3>Live updates: StreamBuilder and StreamProvider</h3></div>
+    <p><code>.snapshots()</code> is a Stream: it sends the whole list again whenever anything changes, on any device. Show it with a <code>StreamBuilder</code> (the Flutter way) or a <code>StreamProvider</code> (the Riverpod way, like Session 8's auth gate).</p>
+    <pre><code><span class="c">// Only MY notes, newest first</span>
+<span class="k">final</span> myNotesProvider = StreamProvider&lt;List&lt;Note&gt;&gt;((ref) {
+  <span class="k">final</span> uid = ref.watch(authStateProvider).value?.uid;     <span class="c">// from Session 8</span>
+  <span class="k">if</span> (uid == <span class="k">null</span>) <span class="k">return</span> Stream.value([]);                <span class="c">// logged out → no notes</span>
+
+  <span class="k">return</span> FirebaseFirestore.instance
+      .collection(<span class="k">'notes'</span>)
+      .where(<span class="k">'userId'</span>, isEqualTo: uid)
+      .orderBy(<span class="k">'createdAt'</span>, descending: <span class="k">true</span>)
+      .snapshots()
+      .map((snapshot) =&gt; snapshot.docs.map(Note.fromFirestore).toList());
+});
+
+<span class="c">// In a ConsumerWidget, exactly like Session 6:</span>
+ref.watch(myNotesProvider).when(
+  loading: () =&gt; Spinner(),
+  error: (e, _) =&gt; ErrorView(e),
+  data: (notes) =&gt; notes.isEmpty ? EmptyState() : NotesList(notes),
+);</code></pre>
+    <p><b>Try this in class:</b> open the app in two windows (or on a phone and in Chrome), logged in as the same user. Add a note in one, and it appears in the other within a second. Open the Firebase console's <b>Data</b> tab too: it updates live as well.</p>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><span class="demo-num">4</span><h3>Queries: where, orderBy, limit</h3></div>
+    <div class="table-wrap"><table>
+      <tr><th>Code</th><th>Means</th></tr>
+      <tr><td><code>.where('userId', isEqualTo: uid)</code></td><td>Only documents whose <code>userId</code> is mine</td></tr>
+      <tr><td><code>.where('done', isEqualTo: false)</code></td><td>Only items not done yet</td></tr>
+      <tr><td><code>.orderBy('createdAt', descending: true)</code></td><td>Newest first</td></tr>
+      <tr><td><code>.limit(20)</code></td><td>At most 20 documents</td></tr>
+    </table></div>
+    <div class="note-box">
+      <span class="label">The index error (everyone gets this once)</span>
+      <p>A query that filters on one field (<code>userId</code>) and sorts by another (<code>createdAt</code>) needs an <b>index</b>. The first time, the app shows an error saying <i>“The query requires an index”</i> with a <b>link</b>. Open the link, click <b>Create index</b>, and wait a minute or two. The query then works.</p>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><span class="demo-num">5</span><h3>Security rules: users only see their own data</h3></div>
+    <p>The Flutter code filters by <code>userId</code>, but that only protects honest apps. Someone could write their own code and ask for <b>everyone's</b> notes. Rules run on Firebase's servers, so they can't be skipped.</p>
+    <p>When you create the database you choose one of two starting points, and <b>neither is safe for a real app</b>:</p>
+    <div class="table-wrap"><table>
+      <tr><th>Mode</th><th>Default rule</th><th>Problem</th></tr>
+      <tr><td><b>Test mode</b></td><td><code>allow read, write: if request.time &lt; …30 days…;</code></td><td><b>Open:</b> anyone on the internet can read and change everything, for 30 days</td></tr>
+      <tr><td><b>Production mode</b></td><td><code>allow read, write: if false;</code></td><td><b>Locked:</b> nobody can read or write anything, including your own app</td></tr>
+    </table></div>
+    <p>Write rules that say exactly who may do what. Firebase console → Firestore → <b>Rules</b> → paste → <b>Publish</b>:</p>
+    <pre><code>rules_version = <span class="k">'2'</span>;
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /notes/{noteId} {
+      <span class="c">// Read, change or delete a note only if it's yours</span>
+      allow read, update, delete: <span class="k">if</span> request.auth != <span class="k">null</span>
+                                 &amp;&amp; request.auth.uid == resource.data.userId;
+      <span class="c">// Create a note only with YOUR id in it</span>
+      allow create: <span class="k">if</span> request.auth != <span class="k">null</span>
+                    &amp;&amp; request.auth.uid == request.resource.data.userId;
+    }
+  }
+}</code></pre>
+    <div class="table-wrap"><table>
+      <tr><th>In the rule</th><th>Means</th></tr>
+      <tr><td><code>request.auth</code></td><td>The badge of whoever is asking. <code>null</code> = not logged in</td></tr>
+      <tr><td><code>request.auth.uid</code></td><td>Their user id (Session 8's <code>user.uid</code>)</td></tr>
+      <tr><td><code>resource.data</code></td><td>The document <b>as it is now</b> in the database</td></tr>
+      <tr><td><code>request.resource.data</code></td><td>The document <b>as it would be</b> after this write (used when creating)</td></tr>
+    </table></div>
+    <div class="note-box">
+      <span class="label">Rules are not filters</span>
+      <p>If your query asks for <b>all</b> notes, Firebase refuses the whole query with <code>permission-denied</code>, even though some of them are yours. The query must ask only for what the rules allow: always include <code>.where('userId', isEqualTo: uid)</code>.</p>
+    </div>
+    <p><b>Prove it works:</b> register two accounts. Add notes as User A. Log out, log in as User B: B sees none of A's notes. Then try a query without the <code>where</code> and watch it fail with <code>permission-denied</code>.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Errors you will see today</h2>
+  <div class="err">
+    <div class="err-item"><b><code>[cloud_firestore/permission-denied]</code></b><span>Your rules said no. Either the rules are still “locked” (production default), the query doesn't filter by <code>userId</code>, or you're not logged in.</span></div>
+    <div class="err-item"><b><code>[cloud_firestore/failed-precondition] The query requires an index</code></b><span>Open the link in the error message, click Create index, wait 1–2 minutes.</span></div>
+    <div class="err-item"><b>“type 'Null' is not a subtype of type 'Timestamp'”</b><span><code>createdAt</code> is null for a moment after adding. Use <code>as Timestamp?</code> and handle null.</span></div>
+    <div class="err-item"><b>“Null check operator used on a null value” at <code>currentUser!</code></b><span>Nobody is logged in. Only open data screens from behind the Session 8 auth gate.</span></div>
+    <div class="err-item"><b>The list never updates</b><span>You used <code>.get()</code> (read once) instead of <code>.snapshots()</code> (live).</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Practice task (in class): Notes app</h2>
+  <ul class="checks">
+    <li><input type="checkbox" id="p1"><label for="p1">Start from your Session 8 login app.</label></li>
+    <li><input type="checkbox" id="p2"><label for="p2">Add a note (title and body), list your notes newest first, edit a note, and delete a note.</label></li>
+    <li><input type="checkbox" id="p3"><label for="p3">Every note stores the logged-in user's <code>userId</code>, and the list only shows yours.</label></li>
+    <li><input type="checkbox" id="p4"><label for="p4">The list updates live: test in two windows.</label></li>
+    <li><input type="checkbox" id="p5"><label for="p5">Publish security rules, then prove with two accounts that User A can't see User B's notes.</label></li>
+  </ul>
+</section>
+
+<section>
+  <h2>Project: Shopping List App</h2>
+  <ul class="checks">
+    <li><input type="checkbox" id="s1"><label for="s1">Log in (reuse Session 8), then a shopping list for <b>your</b> account only.</label></li>
+    <li><input type="checkbox" id="s2"><label for="s2">Add an item with a validated text field. Each item stores <code>name</code>, <code>done</code>, <code>userId</code> and <code>createdAt</code>.</label></li>
+    <li><input type="checkbox" id="s3"><label for="s3">Tick an item to mark it done (an <b>update</b>), and swipe or tap to delete it.</label></li>
+    <li><input type="checkbox" id="s4"><label for="s4">The list is shown live with a <code>StreamBuilder</code> or <code>StreamProvider</code>, with loading, empty and error states.</label></li>
+    <li><input type="checkbox" id="s5"><label for="s5">Security rules so each user only reads and writes their own items.</label></li>
+    <li><input type="checkbox" id="s6"><label for="s6">Bonus: a “Clear done items” button, and a count of items left in the AppBar.</label></li>
+  </ul>
+</section>
+
+<section>
+  <h2>Check yourself</h2>
+  <div class="qa">
+    <details><summary>What's the difference between a collection and a document?</summary><p>A collection is a drawer that holds many documents. A document is one record with an id and fields.</p></details>
+    <details><summary>What's the difference between .get() and .snapshots()?</summary><p><code>.get()</code> reads once. <code>.snapshots()</code> is a Stream that sends the data again every time it changes.</p></details>
+    <details><summary>Why do we store userId in every document?</summary><p>So we can ask only for the current user's documents, and so the security rules can check that a document belongs to whoever is asking.</p></details>
+    <details><summary>Why isn't filtering by userId in Flutter enough to keep data private?</summary><p>Anyone can write their own code that skips the filter. Security rules run on Firebase's servers, so they can't be skipped.</p></details>
+    <details><summary>Why does a query for all notes fail even if some are mine?</summary><p>Rules aren't filters. The query must ask only for documents the rules allow, so it has to include <code>where('userId', isEqualTo: uid)</code>.</p></details>
+  </div>
+</section>
+
+<section>
+  <span class="label">Next session</span>
+  <p><b>Session 10 · Polishing UI/UX.</b> Light and dark themes with a saved toggle, Hero transitions, animations, responsive layouts, and your own app icon and splash screen.</p>
+</section>
+
+</div>
+
+</body>
+</html>

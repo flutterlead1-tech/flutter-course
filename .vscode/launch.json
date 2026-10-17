@@ -3,6 +3,13 @@
   // Each one runs in debug mode, so breakpoints and the Widget Inspector work.
   "version": "0.2.0",
   "configurations": [
+    // ---------- Session 8 · Firebase Auth ----------
+    // Fixed port, so Chrome keeps the login between runs (same reason as Session 7).
+    { "name": "S8 · Login Starter App", "type": "dart", "request": "launch", "program": "lib/login_starter/main.dart", "args": ["--web-port", "5050"], "presentation": { "group": "Session 8", "order": 0 } },
+    { "name": "S8 · Demo 1 · Firebase Connected", "type": "dart", "request": "launch", "program": "lib/day8_demos/demo1_firebase_connected.dart", "args": ["--web-port", "5050"], "presentation": { "group": "Session 8", "order": 1 } },
+    { "name": "S8 · Demo 2 · Register & Log In", "type": "dart", "request": "launch", "program": "lib/day8_demos/demo2_register_login.dart", "args": ["--web-port", "5050"], "presentation": { "group": "Session 8", "order": 2 } },
+    { "name": "S8 · Demo 3 · Auth Gate", "type": "dart", "request": "launch", "program": "lib/day8_demos/demo3_auth_gate.dart", "args": ["--web-port", "5050"], "presentation": { "group": "Session 8", "order": 3 } },
+
     // ---------- Session 7 · Local Storage ----------
     // Fixed port: in Chrome, saved data belongs to one address (localhost:5050).
     // A random port on every run would look like a new site with empty storage.
